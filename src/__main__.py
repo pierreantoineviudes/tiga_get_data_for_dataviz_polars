@@ -2,8 +2,6 @@
     This module executes the scripts to process the data using polars 
 """
 
-import os
-
 from get_naf_notion import get_urls_from_notion
 from process_data import process_geoloc, process_etablissements, merge_dataframes
 

@@ -9,11 +9,11 @@ import polars as pl
 
 
 # ---------------- DEFINE PATHS -------------------------------------------------------------------
-GEOLOC_PATH = ".\data\GeolocalisationEtablissement_Sirene_pour_etudes_statistiques_utf8\GeolocalisationEtablissement_Sirene_pour_etudes_statistiques_utf8.csv"
-PATH_ETABLISSEMENTS = ".\data\StockEtablissement_utf8\StockEtablissement_utf8.csv"
-DIR_ETABLISSEMENTS = ".\data\output\etablissement"
-DIR_GEOLOC = ".\data\output\geoloc"
-OUTPUT_PATH = ".\data\output\ouput.csv"
+GEOLOC_PATH = r".\data\GeolocalisationEtablissement_Sirene_pour_etudes_statistiques_utf8\GeolocalisationEtablissement_Sirene_pour_etudes_statistiques_utf8.csv"
+PATH_ETABLISSEMENTS = r".\data\StockEtablissement_utf8\StockEtablissement_utf8.csv"
+DIR_ETABLISSEMENTS = r".\data\output\etablissement"
+DIR_GEOLOC = r".\data\output\geoloc"
+OUTPUT_PATH = r".\data\output\ouput.csv"
 # -------------------------------------------------------------------------------------------------
 
 
@@ -35,11 +35,13 @@ def process_geoloc(departements: List[int]) -> None:
     while batches:
         df_current_batches = pl.concat(batches)
         # process df
-        df_current_batches = df_current_batches.with_columns(
-            (df_current_batches["plg_code_commune"] // 1000).rename("departement")
-        )
-        df_current_batches = df_current_batches.filter(
-            pl.col("departement").is_in(departements)
+        df_current_batches = (
+            df_current_batches.lazy()
+            .with_columns(
+                (df_current_batches["plg_code_commune"] // 1000).rename("departement")
+            )
+            .filter(pl.col("departement").is_in(departements))
+            .collect()
         )
 
         # save df
@@ -77,19 +79,17 @@ def process_etablissements(departements: List[int]) -> None:
         df_current_batches = pl.concat(batches)
 
         # process df
-        df_current_batches = df_current_batches.with_columns(
-            (df_current_batches["codeCommuneEtablissement"] // 1000).rename(
-                "departement"
+        df_current_batches = (
+            df_current_batches.lazy()
+            .with_columns(
+                (df_current_batches["codeCommuneEtablissement"] // 1000).rename(
+                    "departement"
+                )
             )
-        )
-        df_current_batches = df_current_batches.filter(
-            pl.col("departement").is_in(departements)
-        )
-        df_current_batches = df_current_batches.filter(
-            pl.col("trancheEffectifsEtablissement").is_not_null()
-        )
-        df_current_batches = df_current_batches.filter(
-            pl.col("activitePrincipaleEtablissement").is_in(naf_codes)
+            .filter(pl.col("departement").is_in(departements))
+            .filter(pl.col("trancheEffectifsEtablissement").is_not_null())
+            .filter(pl.col("activitePrincipaleEtablissement").is_in(naf_codes))
+            .collect()
         )
         # save df
         df_current_batches.write_csv(
@@ -102,28 +102,6 @@ def process_etablissements(departements: List[int]) -> None:
 
 def merge_dataframes() -> None:
     """function to merge dataframes"""
-    paths_etablissement = os.listdir(DIR_ETABLISSEMENTS)
-    list_df = []
-    for path_file_etablissement in paths_etablissement:
-        path_etablissement = os.path.join(DIR_ETABLISSEMENTS, path_file_etablissement)
-        list_df.append(pl.read_csv(path_etablissement))
-    df_etablissements = pl.concat(list_df)
-
-    paths_geoloc = os.listdir(DIR_GEOLOC)
-    list_df = []
-    for path_file_geoloc in paths_geoloc:
-        path_geoloc = os.path.join(DIR_GEOLOC, path_file_geoloc)
-        list_df.append(pl.read_csv(path_geoloc))
-    df_geoloc = pl.concat(list_df)
-    df_total = df_etablissements.join(df_geoloc, on=["siret", "departement"])
-    df_total = df_total.rename(
-        {
-            "x_longitude": "lng",
-            "y_latitude": "lat",
-            "trancheEffectifsEtablissement": "RH",
-            "activitePrincipaleEtablissement": "NAF",
-        }
-    )
     dict_rh = {
         0: 0,
         1: 2,
@@ -141,5 +119,31 @@ def merge_dataframes() -> None:
         52: 7500,
         53: 10000,
     }
-    df_total = df_total.with_columns(pl.col("RH").replace_strict(dict_rh))
+    paths_etablissement = os.listdir(DIR_ETABLISSEMENTS)
+    list_df = []
+    for path_file_etablissement in paths_etablissement:
+        path_etablissement = os.path.join(DIR_ETABLISSEMENTS, path_file_etablissement)
+        list_df.append(pl.read_csv(path_etablissement))
+    df_etablissements = pl.concat(list_df)
+
+    paths_geoloc = os.listdir(DIR_GEOLOC)
+    list_df = []
+    for path_file_geoloc in paths_geoloc:
+        path_geoloc = os.path.join(DIR_GEOLOC, path_file_geoloc)
+        list_df.append(pl.read_csv(path_geoloc))
+    df_geoloc = pl.concat(list_df).lazy()
+    df_total = (
+        df_etablissements.lazy()
+        .join(df_geoloc, on=["siret", "departement"])
+        .rename(
+            {
+                "x_longitude": "lng",
+                "y_latitude": "lat",
+                "trancheEffectifsEtablissement": "RH",
+                "activitePrincipaleEtablissement": "NAF",
+            }
+        )
+        .with_columns(pl.col("RH").replace_strict(dict_rh))
+        .collect()
+    )
     df_total.write_csv(OUTPUT_PATH)
