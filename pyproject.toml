@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "tiga-get-data-for-dataviz-polars"
+version = "0.1.0"
+description = "a project for processnig data with polars"
+authors = ["Pierre-Antoine Viudès <pierre.antoine.viudes@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+python-dotenv = "^1.0.1"
+tqdm = "^4.66.5"
+pandas = "^2.2.3"
+
+[tool.poetry.group.dev.dependencies]
+polars = "^1.8.2"
+numpy = "^2.1.1"
+requests = "^2.32.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

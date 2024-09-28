@@ -7,7 +7,7 @@ from process_data import process_geoloc, process_etablissements, merge_dataframe
 
 if __name__ == "__main__":
     departements = [59, 62]
-    # get_urls_from_notion()
+    get_urls_from_notion()
     process_geoloc(departements=departements)
     process_etablissements(departements=departements)
     merge_dataframes()
